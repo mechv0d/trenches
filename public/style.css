@@ -229,7 +229,7 @@ button.danger { color: var(--red-2); border-color: #5a2e2a; }
 .rank-card .rk-perks span { font-family: var(--mono); font-size: 9px; color: #bdb89f; border: 1px solid #333827; padding: 2px 6px; }
 .deploy-right { display: flex; flex-direction: column; gap: 10px; }
 .map-frame { position: relative; border: 1px solid var(--line); background: #0a0c07; overflow: hidden; }
-#deployMap { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+#deployMap { display: block; width: 100%; height: auto; image-rendering: auto; }
 .map-scan { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 0, rgba(217,164,65,.05) 50%, transparent 51%); background-size: 100% 6px; opacity: .4; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 16px; font-family: var(--mono); font-size: 9px; letter-spacing: .14em; color: var(--muted); }
 .map-legend span { display: flex; align-items: center; gap: 6px; }
@@ -592,3 +592,57 @@ button.danger { color: var(--red-2); border-color: #5a2e2a; }
   .action-bar { display: none; }
   .radio-panel { width: calc(100vw - 32px); bottom: 120px; }
 }
+
+/* ============================================================
+   VEHICLE CREW STRIP / RADIAL / SETTINGS / KIT ICONS
+   ============================================================ */
+.seat-panel {
+  position: absolute; left: 50%; bottom: 168px; transform: translateX(-50%);
+  display: flex; align-items: flex-end; gap: 6px; z-index: 12;
+  font-family: var(--mono); pointer-events: none;
+}
+.seat-panel .seat-veh {
+  font-size: 9px; letter-spacing: .16em; color: var(--amber);
+  text-shadow: 0 1px 3px #000; margin-right: 6px; align-self: center;
+}
+.seat-panel .seat {
+  width: 46px; height: 40px; border: 1px solid rgba(217,164,65,.75);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: transparent; color: #d9d6c4; font-size: 8px; letter-spacing: .08em;
+  text-shadow: 0 1px 3px #000;
+}
+.seat-panel .seat.empty { border-style: dashed; border-color: rgba(217,214,196,.4); color: rgba(217,214,196,.5); }
+.seat-panel .seat.mine { border-color: #f0c469; box-shadow: 0 0 8px rgba(240,196,105,.45); color: #f0c469; }
+.seat-panel .seat b { font-size: 9px; color: var(--amber-2); font-weight: 400; }
+.seat-panel .seat small { font-size: 7px; color: var(--muted); max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.radial {
+  position: fixed; inset: 0; z-index: 46; display: flex; align-items: center; justify-content: center;
+}
+.radial-ring {
+  width: 300px; height: 300px; border-radius: 50%; border: 1px solid rgba(217,164,65,.35);
+  background: radial-gradient(circle, rgba(10,12,8,.25), rgba(10,12,8,.55));
+}
+.radial-items { position: absolute; width: 300px; height: 300px; }
+.radial-item {
+  position: absolute; width: 70px; height: 46px; transform: translate(-50%, -50%);
+  background: rgba(14,17,10,.82); border: 1px solid #4a4f36; color: #d9d6c4;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .08em; padding: 4px;
+}
+.radial-item:hover, .radial-item.sel { border-color: var(--amber); color: var(--amber-2); background: rgba(217,164,65,.12); }
+.radial-item b { display: block; font-size: 10px; color: var(--amber); font-weight: 400; }
+.radial-label {
+  position: absolute; bottom: calc(50% - 190px); left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--amber);
+  text-shadow: 0 1px 4px #000; white-space: nowrap;
+}
+
+.pause-tabs { display: flex; gap: 6px; margin: 12px 0 8px; }
+.pause-tabs button { flex: 1; background: #14170f; border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .12em; padding: 7px 4px; }
+.pause-tabs button.on { border-color: var(--amber); color: var(--amber-2); }
+.gfx-row { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; color: #b9b6a2; padding: 9px 4px; border-bottom: 1px solid rgba(122,126,98,.16); }
+.gfx-row input { accent-color: #d9a441; width: 15px; height: 15px; }
+.act.disabled { opacity: .38; }
+.cta-icon { width: 46px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(122,126,98,.45); background: linear-gradient(145deg, rgba(255,255,255,.06), rgba(0,0,0,.35)); margin-bottom: 7px; }
+.cta-icon span { font-family: var(--mono); font-size: 15px; color: var(--amber-2); }
+.card .c-icon { margin-bottom: 7px; }

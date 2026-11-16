@@ -162,15 +162,15 @@ for (let ty = 0; ty < ROWS; ty++) {
   }
 }
 
-// Central river. It meanders through the middle of the map with a strong
-// double bend, and is 50% wider than the old channel. Roads laid afterwards
-// cut natural crossings through it.
+// Central river. It runs down the middle of the map with a strong, lazy
+// double bend and a 50%-wider channel. Roads laid afterwards cut natural
+// crossings through it.
 for (let ty = 0; ty < ROWS; ty++) {
-  const rx = 88
-    + Math.round(Math.sin(ty * 0.115) * 7)
-    + Math.round(Math.sin(ty * 0.041 + 1.7) * 5)
-    + Math.round(Math.sin(ty * 0.23 + 0.4) * 2);
-  const width = 8;
+  const rx = 100
+    + Math.round(Math.sin(ty * 0.115) * 11)
+    + Math.round(Math.sin(ty * 0.041 + 1.7) * 7)
+    + Math.round(Math.sin(ty * 0.23 + 0.4) * 3);
+  const width = 12; // 50% wider than the old 8-tile channel
   for (let w = 0; w < width; w++) setT(rx + w, ty, T.WATER);
 }
 
@@ -302,25 +302,30 @@ function makeBuilding(bx, by, w, h, complex) {
   const stepX = door.x + (door.side === 'e' ? 1 : door.side === 'w' ? -1 : 0);
   const stepY = door.y + (door.side === 's' ? 1 : door.side === 'n' ? -1 : 0);
   doorSteps.add(stepY * COLS + stepX);
-  // Big houses near the centre get interior partitions, so a squad has to
-  // clear several rooms instead of one open hall.
+  // Big inner-city houses get interior partitions, so a squad has to clear
+  // several rooms instead of one open hall.
   let rooms = 1;
   if (complex && w >= 7) {
-    const px = bx + Math.max(2, Math.floor(w / 2));
-    const gapA = by + 2 + Math.floor(rng() * Math.max(1, h - 4));
-    for (let y = 1; y < h - 1; y++) {
-      if (y === gapA) continue;
-      if (tget(px, by + y) === T.FLOOR && !(px === door.x && by + y === door.y)) setT(px, by + y, T.WALL);
-    }
-    rooms++;
-    if (h >= 8 && rng() < 0.7) {
-      const py = by + Math.max(2, Math.floor(h / 2));
-      const gapB = bx + 2 + Math.floor(rng() * Math.max(1, w - 4));
-      for (let x = 1; x < w - 1; x++) {
-        if (x === gapB) continue;
-        if (tget(bx + x, py) === T.FLOOR && !(bx + x === door.x && py === door.y)) setT(bx + x, py, T.WALL);
+    const makePartition = (vertical, at, gap) => {
+      if (vertical) {
+        for (let y = 1; y < h - 1; y++) {
+          if (y === gap) continue;
+          if (tget(bx + at, by + y) === T.FLOOR && !(bx + at === door.x && by + y === door.y)) setT(bx + at, by + y, T.WALL);
+        }
+      } else {
+        for (let x = 1; x < w - 1; x++) {
+          if (x === gap) continue;
+          if (tget(bx + x, by + at) === T.FLOOR && !(bx + x === door.x && by + at === door.y)) setT(bx + x, by + at, T.WALL);
+        }
       }
-      rooms += 2;
+      rooms += 1;
+    };
+    const px = bx + Math.max(2, Math.floor(w / 2));
+    makePartition(true, px - bx, 2 + Math.floor(rng() * Math.max(1, h - 4)));
+    if (w >= 10) makePartition(true, Math.max(2, Math.floor(w / 3)), 2 + Math.floor(rng() * Math.max(1, h - 4)));
+    if (h >= 8 && rng() < 0.85) {
+      makePartition(false, Math.max(2, Math.floor(h / 2)), 2 + Math.floor(rng() * Math.max(1, w - 4)));
+      if (h >= 11 && rng() < 0.6) makePartition(false, Math.max(2, Math.floor(h / 3)), 2 + Math.floor(rng() * Math.max(1, w - 4)));
     }
   }
   // Windows punched into the facades.
@@ -354,14 +359,17 @@ function makeTown(cx, cy, span, complex) {
       if (townGround(tget(cx + w, cy + d)) || tget(cx + w, cy + d) === T.ROAD) makeStreet(cx + w, cy + d);
     }
   }
-  // paved central plaza
+  // paved central plaza (never paves over the river)
   for (let oy = -3; oy <= 3; oy++) for (let ox = -3; ox <= 3; ox++) {
-    if (inMap(cx + ox, cy + oy)) setT(cx + ox, cy + oy, T.SAND);
+    if (!inMap(cx + ox, cy + oy)) continue;
+    if (tget(cx + ox, cy + oy) === T.WATER) continue;
+    setT(cx + ox, cy + oy, T.SAND);
   }
   // Building lots. Interior towns get big multi-room houses; the map edges
   // keep small single-room cottages.
   const lots = [];
-  const step = complex ? 9 : 7;
+  // Inner-town houses are 1.5-2x the old footprint and have several rooms.
+  const step = complex ? 14 : 7;
   for (let gy = -span + 1; gy <= span - 2; gy += step) {
     for (let gx = -span + 1; gx <= span - 2; gx += step) lots.push([gx, gy]);
   }
@@ -370,9 +378,9 @@ function makeTown(cx, cy, span, complex) {
     [lots[i], lots[j]] = [lots[j], lots[i]];
   }
   for (const [gx, gy] of lots) {
-    if (rng() < 0.25) continue;
-    const w = complex ? 7 + Math.floor(rng() * 3) : 6 + Math.floor(rng() * 2);
-    const h = complex ? 7 + Math.floor(rng() * 3) : 6 + Math.floor(rng() * 2);
+    if (rng() < 0.22) continue;
+    const w = complex ? 11 + Math.floor(rng() * 4) : 6 + Math.floor(rng() * 2);
+    const h = complex ? 11 + Math.floor(rng() * 4) : 6 + Math.floor(rng() * 2);
     makeBuilding(cx + gx, cy + gy, w, h, complex);
   }
 }
@@ -506,6 +514,17 @@ function segmentHitsRock(x0, y0, x1, y1) {
     if (rockHitAt(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return true;
   }
   return false;
+}
+/* Shortest distance from a point to a bullet's swept segment. Fast rounds
+   travel further than a soldier is wide in one tick, so endpoint-only tests
+   let point-blank targets (especially beside a vehicle) slip through. */
+function segmentDistance(x0, y0, x1, y1, px, py) {
+  const dx = x1 - x0, dy = y1 - y0;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 0.0001) return Math.hypot(px - x0, py - y0);
+  let t = ((px - x0) * dx + (py - y0) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x0 + dx * t), py - (y0 + dy * t));
 }
 
 function isTrenchAt(x, y) {
@@ -650,7 +669,11 @@ function findPath(sx, sy, gx, gy) {
       if (dx && dy && (!walkTile(cx + dx, cy) || !walkTile(cx, cy + dy))) continue;
       const ni = idx(nx, ny);
       if (PCLOSED[ni] === gen) continue;
-      const ng = PG[cur] + ((dx && dy) ? Math.SQRT2 : 1);
+      // Bots prefer roads and bridges: a mild step surcharge on open ground
+      // pulls long marches onto the road network without forbidding shortcuts.
+      const tileT = terrain[ni];
+      const roadBias = (tileT === T.ROAD || tileT === T.BRIDGE) ? 0.9 : 1.0;
+      const ng = PG[cur] + ((dx && dy) ? Math.SQRT2 : 1) * roadBias;
       if (PSTAMP[ni] !== gen || ng < PG[ni]) {
         PSTAMP[ni] = gen; PG[ni] = ng; PFROM[ni] = cur;
         PF[ni] = ng + octile(nx, ny, goalT.tx, goalT.ty);
@@ -738,6 +761,47 @@ function isBridgeAt(x, y) {
     if (Math.abs(x - b.x) <= (w * TILE) / 2 && Math.abs(y - b.y) <= (h * TILE) / 2) return true;
   }
   return false;
+}
+function vehicleRadius(v) {
+  return v.kind === 'tank' ? 22 : v.kind === 'truck' ? 17 : 19;
+}
+/* A vehicle needs its whole hull on drivable ground, not just its centre.
+   Interior floors are excluded, so transports cannot squeeze into houses. */
+function vehicleCanMove(v, nx, ny) {
+  const r = vehicleRadius(v) * 0.8;
+  if (!vehicleWalkable(nx, ny, true)) return false;
+  for (const [ox, oy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+    if (!vehicleWalkable(nx + ox, ny + oy, true)) return false;
+  }
+  return true;
+}
+/* Running people down: damage scales with vehicle type and impact speed. */
+function vehicleRunOver(v, now) {
+  const spd = Math.abs(v.speed || 0);
+  if (spd < 35) return;
+  const def = VEHICLES[v.kind] || VEHICLES.truck;
+  const f = Math.min(1, spd / Math.max(40, (def.speed || 100) * 0.65));
+  const base = v.kind === 'tank' ? 260 : v.kind === 'apc' ? 115 : v.kind === 'armored_car' ? 95 : 60;
+  const dmg = base * f;
+  const attacker = findOwner(v.driver);
+  const hitPerson = (t, isBot) => {
+    if (t.dead || t.vehicle || !t.side || t.side === v.side) return;
+    if (Math.hypot(t.x - v.x, t.y - v.y) > 32) return;
+    if (now - (t.lastRunOver || 0) < 900) return;
+    t.lastRunOver = now;
+    if (isBot) damageBot(t, dmg, attacker, 'vehicle', true);
+    else damagePlayer(t, dmg, attacker && !attacker.isBot ? attacker : null, 'vehicle', true);
+    // shove the victim clear of the tracks (unless the hit was fatal)
+    if (!t.dead) {
+      const a = Math.atan2(t.y - v.y, t.x - v.x);
+      const px = t.x + Math.cos(a) * 26, py = t.y + Math.sin(a) * 26;
+      if (isBot ? botCanStand(px, py) : walkable(px, py, true)) { t.x = px; t.y = py; }
+    }
+    v.speed *= 0.88;
+    evt('vehicle_impact', { x: t.x, y: t.y, kind: v.kind, side: v.side, heavy: v.kind === 'tank', person: true });
+  };
+  for (const t of players.values()) hitPerson(t, false);
+  for (const t of bots) hitPerson(t, true);
 }
 
 /* ------------------------------------------------------------------ */
@@ -842,6 +906,45 @@ function teamPlayers(side) {
 function sideHasFactory(side) {
   return buildings.some(b => b.side === side && b.kind === 'factory' && b.hp > 0);
 }
+function hasBuildingNear(side, kinds, x, y, range) {
+  return buildings.some(b => b.side === side && b.hp > 0 && kinds.includes(b.kind) && Math.hypot(b.x - x, b.y - y) < range);
+}
+function nearArmory(p) {
+  return hasBuildingNear(p.side, ['armory'], p.x, p.y, 220);
+}
+function nearDepotOrMob(p) {
+  const mob = mobOfSide(p.side);
+  if (Math.hypot(mob.x - p.x, mob.y - p.y) < 300) return true;
+  return hasBuildingNear(p.side, ['depot'], p.x, p.y, 200);
+}
+function nearSupplyPoint(p, range) {
+  if (nearestAlliedPoint(p, range || 700)) return true;
+  return hasBuildingNear(p.side, ['bunker', 'armory', 'factory', 'depot', 'hospital', 'mortar_crew'], p.x, p.y, (range || 700) * 0.7);
+}
+function mortarCrewCount(side) {
+  return buildings.filter(b => b.side === side && b.kind === 'mortar_crew' && b.hp > 0).length;
+}
+/* Supply bots drive their own dedicated lorries, so they never take the truck
+   a player just requested from the depot. */
+function assignSupplyVehicle(b, createIfMissing) {
+  let v = vehicles.find(x => x.id === b.vehicle && x.hp > 0);
+  if (v) return v;
+  v = vehicles.find(x => x.side === b.side && x.kind === 'truck' && x.hp > 0 && x.botSupply && !bots.some(o => o !== b && o.vehicle === x.id));
+  if (!v && createIfMissing) {
+    const mob = b.side === 'red' ? RED_MOB : BLUE_MOB;
+    v = {
+      id: nextId++, kind: 'truck', side: b.side,
+      x: mob.x + (b.side === 'red' ? 190 : -190), y: mob.y + 70, angle: b.side === 'red' ? 0 : Math.PI,
+      heading: b.side === 'red' ? 0 : Math.PI, speed: 0,
+      hp: 450, maxHp: 450, driver: null, crew: {}, cooldown: 0,
+      cargo: emptyCarry(), ammo: 0, magAmmo: 0, reloadingUntil: 0, botSupply: true,
+    };
+    vehicles.push(v);
+    bcast({ type: 'vehicle_added', vehicle: v });
+  }
+  if (v) { b.vehicle = v.id; v.driver = b.id; }
+  return v;
+}
 
 /* ------------------------------------------------------------------ */
 /*  War lifecycle                                                      */
@@ -877,23 +980,33 @@ function initWorld() {
     vehicles.push({ id: nextId++, kind: 'truck', side, x: mob.x + (side === 'red' ? 160 : -160), y: mob.y + 40, angle: 0, heading: 0, speed: 0, hp: 450, maxHp: 450, driver: null, crew: {}, cooldown: 0, cargo: emptyCarry() });
   }
 
-  // Bot army
+  // Bot army: a mixed force of assault troops, lorry drivers, engineers and
+  // medics. Roles are assigned per side so every army has a support tail.
   bots = [];
   const names = [...BOT_NAMES];
-  for (let i = 0; i < 20; i++) spawnBot(i < 10 ? 'red' : 'blue', names[i % names.length] + '_' + (1 + (i % 7)));
+  const rolePlan = ['assault', 'assault', 'assault', 'assault', 'supply', 'engineer', 'medic', 'assault', 'assault', 'assault'];
+  for (let i = 0; i < 20; i++) {
+    const side = i < 10 ? 'red' : 'blue';
+    spawnBot(side, names[i % names.length] + '_' + (1 + (i % 7)), rolePlan[i % 10]);
+  }
 }
 
-function spawnBot(side, name) {
+function spawnBot(side, name, role) {
   const mob = side === 'red' ? RED_MOB : BLUE_MOB;
   const spot = safeSpot(mob.x + (Math.random() - 0.5) * 120, mob.y + (Math.random() - 0.5) * 160);
+  role = role || 'assault';
   const b = {
     id: 'bot' + nextId++, name, side, x: spot.x, y: spot.y,
     angle: side === 'red' ? 0 : Math.PI, hp: 100, maxHp: 100, weapon: 'rifle', armor: 'belt_helmet',
     z: 0, cooldown: 0, reload: 0, ammo: 5, target: null, respawn: 0, dead: false,
     kills: 0, deaths: 0, assists: 0, recentHits: [], burst: 0,
     wander: Math.random() * 10, barkTimer: 6 + Math.random() * 10, xp: 0, isBot: true,
+    role, uniform: role === 'medic' ? 'medic' : null,
+    fear: 0, lastShot: 0, lastBark: 0, objective: null, nextThink: 0,
+    path: null, pathT: 0, supplyTarget: null, vehicle: null,
   };
   bots.push(b);
+  if (role === 'supply') assignSupplyVehicle(b, true);
   return b;
 }
 
@@ -1012,8 +1125,8 @@ function makePlayer(ws) {
     vehicle: null, freq: { high: 0, low: 0 }, knownFreqs: [],
     kills: 0, deaths: 0, assists: 0, captures: 0, gatherTimer: 0,
     carry: emptyCarry(), carryMax: CARRY_CAP, lastDeposit: 0, fullNotice: 0,
-    recentHits: [],
-    stats: newStats(), input: { up: false, down: false, left: false, right: false, sprint: false, aimX: 0, aimY: 0, shoot: false, interact: false },
+    recentHits: [], seat: null,
+    stats: newStats(), input: { up: false, down: false, left: false, right: false, sprint: false, aimX: 0, aimY: 0, shoot: false, interact: false, holdBuild: false, radio: false },
     radioCaptured: false, lastBark: 0, spawnPoint: null,
   };
 }
@@ -1092,7 +1205,8 @@ function spawnPlayer(p, pointId) {
       if (cp.contesting || n > 0) {
         contested = true;
         const away = n ? Math.atan2(cp.y - ey / n, cp.x - ex / n) : Math.random() * Math.PI * 2;
-        const dist = 280 + Math.random() * 140;
+        // 15-25 metres (the HUD treats 10 world pixels as one metre).
+        const dist = 150 + Math.random() * 100;
         sx = cp.x + Math.cos(away) * dist;
         sy = cp.y + Math.sin(away) * dist;
       }
@@ -1188,7 +1302,13 @@ function killPlayer(p, killer, weaponName) {
   awardAssists(p, killer);
   p.dead = true; p.hp = 0; p.deathAt = Date.now();
   p.deaths++; p.kills = p.kills;
-  if (p.vehicle) { p.vehicle.driver = null; p.vehicle = null; }
+  if (p.vehicle) {
+    const v = p.vehicle;
+    if (v.driver === p.id) v.driver = null;
+    if (v.crew) for (const id of Object.keys(v.crew)) if (+id === p.id) delete v.crew[id];
+    p.vehicle = null;
+    p.seat = null;
+  }
   // Fallen soldiers spill whatever they were hauling.
   spawnDrop(p.x, p.y, p.carry, p.side);
   p.carry = emptyCarry();
@@ -1214,6 +1334,11 @@ function killBot(b, killer, weaponName) {
   awardAssists(b, killer);
   b.dead = true; b.hp = 0; b.respawn = Date.now() + 9000;
   b.deaths = (b.deaths || 0) + 1;
+  if (b.vehicle) {
+    const v = vehicles.find(x => x.id === b.vehicle);
+    if (v && v.driver === b.id) v.driver = null;
+    b.vehicle = null;
+  }
   if (killer) {
     if (killer.isBot) { killer.kills = (killer.kills || 0) + 1; }
     else {
@@ -1237,7 +1362,9 @@ function killBot(b, killer, weaponName) {
     const spot = safeSpot(sp.x + (Math.random() - 0.5) * 80, sp.y + (Math.random() - 0.5) * 80);
     b.x = spot.x; b.y = spot.y;
     b.hp = b.maxHp; b.dead = false; b.respawn = 0; b.z = isTrenchAt(b.x, b.y) ? -1 : 0; b.exposed = 0;
-    b.path = null; b.pathT = 0;
+    b.path = null; b.pathT = 0; b.objective = null; b.healTarget = null;
+    b.medkitUntil = 0; b.medkitNext = 0; b.lastHitAt = 0;
+    if (b.role === 'supply') assignSupplyVehicle(b, true);
   }, 9000);
 }
 
@@ -1285,6 +1412,7 @@ function findOwner(id) {
 
 function damagePlayer(target, dmg, attacker, weaponName, ignoreArmor) {
   if (target.dead || target.protect > Date.now()) return;
+  target.lastHitAt = Date.now();
   const inTrench = isTrenchAt(target.x, target.y);
   // Trench cover: only 40% of incoming fire actually connects.
   if (inTrench && !ignoreArmor && Math.random() > 0.40) {
@@ -1311,6 +1439,7 @@ function damagePlayer(target, dmg, attacker, weaponName, ignoreArmor) {
 
 function damageBot(target, dmg, attacker, weaponName, ignoreArmor) {
   if (target.dead) return;
+  target.lastHitAt = Date.now();
   if (isTrenchAt(target.x, target.y) && !ignoreArmor && Math.random() > 0.40) return;
   recordHit(target, attacker);
   const armor = ARMOR[target.armor] || ARMOR.none;
@@ -1335,9 +1464,12 @@ function damageVehicle(v, dmg, attacker, weaponName) {
     explode(v.x, v.y, 100, 90, attacker, 'vehicle');
     if (v.driver) {
       const drv = [...players.values()].find(p => p.id === v.driver);
-      if (drv) { damagePlayer(drv, 150, attacker, 'vehicle explosion', true); drv.vehicle = null; }
+      if (drv) { damagePlayer(drv, 150, attacker, 'vehicle explosion', true); drv.vehicle = null; drv.seat = null; }
+      const bdrv = bots.find(o => o.id === v.driver);
+      if (bdrv) { damageBot(bdrv, 150, attacker, 'vehicle explosion', true); bdrv.vehicle = null; }
       v.driver = null;
     }
+    for (const o of bots) if (o.vehicle === v.id) o.vehicle = null;
     if (attacker && attacker.ws) {
       addXp(attacker, 60);
       send(attacker.ws, { type: 'toast', text: `DESTROYED — ${def.name}`, level: 'amber' });
@@ -1436,6 +1568,33 @@ function callBarrage(p, x, y) {
   }
 }
 
+/* Mortar crews fire a short walking barrage. Two crews on the same side cut
+   the reload by a third. The strike is aimed with Z and paid from ammunition. */
+function callMortar(p, x, y) {
+  if (!p.side || p.dead) return;
+  if (!p.registered) return send(p.ws, { type: 'toast', text: 'Enlist to direct mortar fire', level: 'red' });
+  const crews = mortarCrewCount(p.side);
+  if (!crews) return send(p.ws, { type: 'toast', text: 'Build a Mortar Crew at an allied point first', level: 'red' });
+  if (!canAfford(p.side, { ammo: 80 })) return send(p.ws, { type: 'toast', text: 'Not enough ammunition (80)', level: 'red' });
+  if (p.mortarCooldown && Date.now() < p.mortarCooldown) {
+    const left = Math.ceil((p.mortarCooldown - Date.now()) / 1000);
+    return send(p.ws, { type: 'toast', text: `Mortars reloading — ${left}s`, level: 'red' });
+  }
+  pay(p.side, { ammo: 80 });
+  const cooldown = 45000 * (crews >= 2 ? 0.67 : 1);
+  p.mortarCooldown = Date.now() + cooldown;
+  evt('mortar_incoming', { x, y, side: p.side, by: p.name });
+  send(p.ws, { type: 'toast', text: `MORTAR STRIKE — ${Math.round(cooldown / 1000)}s RELOAD`, level: 'amber' });
+  warHighlight(`${p.name} called a mortar strike`, p.side);
+  for (let i = 0; i < 7; i++) {
+    setTimeout(() => {
+      const ang = Math.random() * Math.PI * 2;
+      const r = Math.random() * 170;
+      explode(x + Math.cos(ang) * r, y + Math.sin(ang) * r, 100, 115, p, 'mortar');
+    }, 2700 + i * 620);
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Economy / building / production                                    */
 /* ------------------------------------------------------------------ */
@@ -1472,6 +1631,8 @@ function pay(side, cost) {
 function equip(p, weapon, armor) {
   if (!p.registered) return send(p.ws, { type: 'toast', text: 'Register to unlock kits', level: 'red' });
   if (p.dead || !p.side) return;
+  // The Armory only works inside the yard of a friendly Armory building.
+  if (!nearArmory(p)) return send(p.ws, { type: 'toast', text: 'Access the Armory at a friendly Armory building', level: 'red' });
   const w = WEAPONS[weapon]; if (!w) return;
   if (p.rank < w.minRank) return send(p.ws, { type: 'toast', text: `Rank required: ${RANKS[w.minRank].name}`, level: 'red' });
   const a = ARMOR[armor]; if (!a) return;
@@ -1543,7 +1704,9 @@ function build(p, kind, x, y, horizontal) {
   const def = BUILDINGS[kind]; if (!def) return;
   if (p.rank < def.minRank) return send(p.ws, { type: 'toast', text: `Rank required: ${RANKS[def.minRank].name}`, level: 'red' });
   // Construction range: two tiles around the soldier.
-  if (Math.hypot(p.x - x, p.y - y) > 72) return send(p.ws, { type: 'toast', text: 'Too far away (2 tiles max)', level: 'red' });
+  if (Math.hypot(p.x - x, p.y - y) > 64) return send(p.ws, { type: 'toast', text: 'Too far away (2 cells max)', level: 'red' });
+  // The construction menu is only available at a MOB or an allied sector.
+  if (!nearSupplyPoint(p, 700)) return send(p.ws, { type: 'toast', text: 'Construction requires a MOB or allied point', level: 'red' });
   if (!walkable(x, y)) return send(p.ws, { type: 'toast', text: 'Cannot build here', level: 'red' });
   // One blueprint at a time per soldier keeps the field readable.
   if (blueprints.some(bp => bp.byId === p.id && bp.side === p.side)) return send(p.ws, { type: 'toast', text: 'You already have a blueprint in progress', level: 'red' });
@@ -1633,17 +1796,18 @@ function updateBlueprints(dt) {
     }
   }
 }
-/* Construction XP was cut by 25%, and frontline / freshly captured ground
-   grants a 15% bonus. */
+/* Construction XP was cut by 25%, and construction on frontline / freshly
+   captured ground grants a 15% bonus. */
 function constructionXp(x, y, side) {
   let xp = 15;
-  const front = capturePoints.some(cp => {
-    if (cp.owner !== side && cp.owner !== 'neutral') return true;
-    if (cp.owner === side && Date.now() - (cp.capturedAt || 0) < 180000) return true;
-    return false;
+  const now = Date.now();
+  const hot = capturePoints.some(cp => {
+    if (Math.hypot(cp.x - x, cp.y - y) > 620) return false;
+    // Enemy-held, neutral, or only recently taken ground counts as the front.
+    if (cp.owner !== side) return true;
+    return now - (cp.capturedAt || 0) < 180000;
   });
-  const nearFront = capturePoints.some(cp => Math.hypot(cp.x - x, cp.y - y) < 520 && cp.owner !== side);
-  if (front || nearFront) xp *= 1.15;
+  if (hot) xp *= 1.15;
   return Math.round(xp);
 }
 
@@ -1653,9 +1817,8 @@ function requestVehicle(p, kind, x, y) {
   const def = VEHICLES[kind]; if (!def) return;
   if (p.rank < def.minRank) return send(p.ws, { type: 'toast', text: `Rank required: ${RANKS[def.minRank].name}`, level: 'red' });
   if (!canAfford(p.side, def.cost)) return send(p.ws, { type: 'toast', text: 'Team stockpile insufficient', level: 'red' });
-  const near = buildings.some(b => b.side === p.side && (b.kind === 'depot' || b.kind === 'factory') && b.hp > 0 && Math.hypot(b.x - p.x, b.y - p.y) < 160)
-    || Math.hypot(p.x - (p.side === 'red' ? RED_MOB.x : BLUE_MOB.x), p.y - (p.side === 'red' ? RED_MOB.y : BLUE_MOB.y)) < 260;
-  if (!near) return send(p.ws, { type: 'toast', text: 'Return to MOB or a depot', level: 'red' });
+  // Vehicles can only be requested at a MOB or a Vehicle Depot.
+  if (!nearDepotOrMob(p)) return send(p.ws, { type: 'toast', text: 'Return to a MOB or Vehicle Depot', level: 'red' });
   pay(p.side, def.cost);
   const v = { id: nextId++, kind, side: p.side, x, y, angle: p.angle, heading: p.angle, speed: 0, hp: def.hp, maxHp: def.hp, driver: null, crew: {},
     cooldown: 0, cargo: emptyCarry(), ammo: def.reserve || 0, magAmmo: def.mag || 0, reloadingUntil: 0 };
@@ -1679,7 +1842,9 @@ function enterVehicle(p) {
     if (v.crew) for (const id of Object.keys(v.crew)) if (+id === p.id) delete v.crew[id];
     p.x = v.x + 30; p.y = v.y + 20;
     p.vehicle = null; p.seat = null;
-    send(p.ws, { type: 'vehicle', vehicle: null }); return;
+    send(p.ws, { type: 'vehicle', vehicle: null });
+    bcast({ type: 'vehicle_crew', id: v.id, crew: vehicleCrewInfo(v) });
+    return;
   }
   let best = null, bd = 120;
   for (const v of vehicles) {
@@ -1703,10 +1868,17 @@ function enterVehicle(p) {
 function vehicleCrewInfo(v) {
   const seats = vehicleSeatCount(v);
   const info = [];
+  const findWho = (id) => {
+    if (id == null) return null;
+    const p = [...players.values()].find(q => q.id === id);
+    if (p) return p.name;
+    const b = bots.find(q => q.id === id);
+    return b ? b.name : null;
+  };
   for (let s = 0; s < seats; s++) {
     let who = null;
-    if (s === 0 && v.driver) { const p = [...players.values()].find(q => q.id === v.driver); if (p) who = p.name; }
-    for (const [id, seat] of Object.entries(v.crew || {})) if (seat === s) { const p = [...players.values()].find(q => q.id === +id); if (p) who = p.name; }
+    if (s === 0 && v.driver) who = findWho(v.driver);
+    for (const [id, seat] of Object.entries(v.crew || {})) if (seat === s) { const n = findWho(+id); if (n) who = n; }
     info.push({ seat: s, name: who, driver: s === 0 });
   }
   return info;
@@ -1948,11 +2120,190 @@ function capturePoint(cp, side) {
   }
 }
 
-const TARGET_NAMES = new Set();
+/* AI support roles fill out the front: assault troops take ground, supply
+   trucks keep sectors stocked, engineers sandbag fresh captures and medics
+   patch up wounded comrades. */
+function updateHospitals(dt, now) {
+  for (const b of buildings) {
+    if (b.kind !== 'hospital' || b.hp <= 0) continue;
+    for (const p of players.values()) {
+      if (p.dead || p.side !== b.side) continue;
+      if (Math.hypot(p.x - b.x, p.y - b.y) > 150) continue;
+      if (now - (p.lastHitAt || 0) < 30000) continue;
+      if (p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + (p.maxHp / 10) * dt);
+    }
+    for (const o of bots) {
+      if (o.dead || o.side !== b.side) continue;
+      if (Math.hypot(o.x - b.x, o.y - b.y) > 150) continue;
+      if (now - (o.lastHitAt || 0) < 30000) continue;
+      if (o.hp < o.maxHp) o.hp = Math.min(o.maxHp, o.hp + (o.maxHp / 10) * dt);
+    }
+  }
+}
+function applyMedkits(now) {
+  for (const p of players.values()) {
+    if (p.dead || !p.medkitUntil || now > p.medkitUntil) continue;
+    if (now < (p.medkitNext || 0)) continue;
+    p.medkitNext = now + 500;
+    p.hp = Math.min(p.maxHp, p.hp + 1);
+  }
+  for (const b of bots) {
+    if (b.dead || !b.medkitUntil || now > b.medkitUntil) continue;
+    if (now < (b.medkitNext || 0)) continue;
+    b.medkitNext = now + 500;
+    b.hp = Math.min(b.maxHp, b.hp + 1);
+  }
+}
+function driveBotVehicle(v, desired, dt, speed) {
+  let da = desired - (v.heading == null ? v.angle : v.heading);
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  v.heading = (v.heading == null ? v.angle : v.heading) + clamp(da, -1.7 * dt, 1.7 * dt);
+  v.angle = v.heading;
+  const spd = speed;
+  const nx = v.x + Math.cos(v.heading) * spd * dt;
+  const ny = v.y + Math.sin(v.heading) * spd * dt;
+  const tree = treeBlockAt(nx, ny, 15);
+  if (tree) {
+    tree.hp = Math.max(0, tree.hp - spd * 0.3);
+    if (tree.hp <= 0) evt('tree_felled', { id: tree.id, x: tree.x, y: tree.y });
+    evt('tree_hit', { id: tree.id, hp: Math.round(tree.hp), maxHp: tree.maxHp });
+    v.speed = 0;
+    return;
+  }
+  if (vehicleWalkable(nx, ny, true)) { v.x = nx; v.y = ny; v.speed = spd; }
+  else {
+    v.speed = 0;
+    // nudge the heading to slide around the obstacle on the next tick
+    v.heading += (Math.floor(Date.now() / 900) % 2 ? 1 : -1) * 0.35;
+  }
+}
+function updateSupplyBot(b, dt, now) {
+  const v = vehicles.find(x => x.id === b.vehicle);
+  if (!v || v.hp <= 0) { b.vehicle = null; return; }
+  b.x = v.x; b.y = v.y; b.angle = v.heading || v.angle;
+  const mob = b.side === 'red' ? RED_MOB : BLUE_MOB;
+  if (!v.cargo) v.cargo = emptyCarry();
+  if (!b.supplyTarget) {
+    let best = null, bs = 1e9;
+    for (const cp of capturePoints) {
+      if (cp.owner !== b.side) continue;
+      const s = (cp.stock ? (cp.stock.scrap + cp.stock.fuel + cp.stock.ammo) : 0);
+      if (s < bs) { bs = s; best = cp; }
+    }
+    b.supplyTarget = best;
+  }
+  if (Math.hypot(v.x - mob.x, v.y - mob.y) < 190 && carryTotal(v.cargo) < 260) {
+    const stock = mobStock[b.side];
+    for (const k of ['scrap', 'fuel', 'ammo']) {
+      const take = Math.min(stock[k] || 0, 90);
+      if (take <= 0) continue;
+      stock[k] -= take; v.cargo[k] = (v.cargo[k] || 0) + take;
+    }
+    syncTeamStock(b.side);
+  }
+  const target = b.supplyTarget;
+  if (!target) {
+    // nothing left to supply: idle around the MOB
+    if (Math.hypot(v.x - mob.x, v.y - mob.y) > 140) driveBotVehicle(v, Math.atan2(mob.y - v.y, mob.x - v.x), dt, 110);
+    return;
+  }
+  if (Math.hypot(v.x - target.x, v.y - target.y) < 150) {
+    if (target.stock && carryTotal(v.cargo) > 0) {
+      for (const k of ['scrap', 'fuel', 'ammo']) {
+        addToStock(target.stock, k, v.cargo[k] || 0);
+        v.cargo[k] = 0;
+      }
+      syncTeamStock(b.side);
+      if (Math.random() < 0.5) warHighlight(`${b.name} delivered supplies to ${target.name}`, b.side);
+    }
+    b.supplyTarget = null;
+    return;
+  }
+  // Prefer the road network for the long haul; follow waypoints when found.
+  if (!b.path || now - (b.pathT || 0) > 5000) botSetPath(b, target.x, target.y, now, 5000);
+  let wp = target;
+  if (b.path && b.pathI < b.path.length) wp = b.path[b.pathI];
+  if (wp && Math.hypot(wp.x - v.x, wp.y - v.y) < 70) b.pathI = (b.pathI || 0) + 1;
+  driveBotVehicle(v, Math.atan2(wp.y - v.y, wp.x - v.x), dt, 138);
+}
+function botBuildBarricade(b, cp, now) {
+  if (now - (b.lastBuildAt || 0) < 24000) return;
+  const r = Math.random();
+  // Engineers dig a trench, stack sandbags, or throw up a bunker/MG nest when
+  // the stockpile can bear it. This keeps captured ground growing defences.
+  const options = [{ kind: 'sandbag', cost: { scrap: 60 }, hp: 250, w: 0, h: 0 }];
+  options.push({ kind: 'trench', cost: { scrap: 40 }, hp: 0 });
+  if (canAfford(b.side, { scrap: 220 })) options.push({ kind: 'bunker', cost: { scrap: 220 }, hp: 900 });
+  if (canAfford(b.side, { scrap: 180, ammo: 60 })) options.push({ kind: 'turret', cost: { scrap: 180, ammo: 60 }, hp: 400 });
+  const pick = options[Math.min(options.length - 1, r < 0.45 ? 0 : r < 0.65 ? 1 : r < 0.88 ? (options.length > 2 ? 2 : 0) : (options.length > 3 ? 3 : 0))];
+  if (!canAfford(b.side, pick.cost)) return;
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2, rr = 70 + Math.random() * 90;
+    const x = cp.x + Math.cos(a) * rr, y = cp.y + Math.sin(a) * rr;
+    if (!walkable(x, y)) continue;
+    const tile = tileOf(x, y);
+    if (pick.kind === 'trench') {
+      if (trenches.has(idx(tile.tx, tile.ty))) continue;
+      pay(b.side, pick.cost);
+      trenches.add(idx(tile.tx, tile.ty));
+      bcast({ type: 'trench_added', tx: tile.tx, ty: tile.ty, side: b.side });
+      evt('built', { x: (tile.tx + 0.5) * TILE, y: (tile.ty + 0.5) * TILE, kind: 'trench', side: b.side, by: b.name });
+      b.lastBuildAt = now;
+      return;
+    }
+    if (buildings.some(o => o.hp > 0 && Math.hypot(o.x - x, o.y - y) < 70)) continue;
+    pay(b.side, pick.cost);
+    const bd = { id: nextId++, kind: pick.kind, side: b.side, x, y, hp: pick.hp, maxHp: pick.hp, angle: 0, cooldown: 0, by: b.name };
+    buildings.push(bd);
+    bcast({ type: 'building_added', building: bd });
+    evt('built', { x, y, kind: pick.kind, side: b.side, by: b.name });
+    b.lastBuildAt = now;
+    return;
+  }
+}
+function findWoundedAlly(b) {
+  let best = null, bd = 520;
+  for (const p of players.values()) {
+    if (p.dead || p.side !== b.side || p.hp >= p.maxHp * 0.75) continue;
+    const d = Math.hypot(p.x - b.x, p.y - b.y);
+    if (d < bd) { bd = d; best = p; }
+  }
+  for (const o of bots) {
+    if (o === b || o.dead || o.side !== b.side || o.hp >= o.maxHp * 0.75) continue;
+    const d = Math.hypot(o.x - b.x, o.y - b.y);
+    if (d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
 function updateBots(dt, now) {
   for (const b of bots) {
     if (b.dead) continue;
+    b.fear = clamp(1 - b.hp / b.maxHp, 0, 1);
+    if (b.role === 'supply') {
+      const lorry = vehicles.find(x => x.id === b.vehicle && x.hp > 0);
+      if (!lorry) { b.vehicle = null; assignSupplyVehicle(b, true); }
+      if (b.vehicle) { updateSupplyBot(b, dt, now); continue; }
+    }
     b._wantMove = false;
+    let healTarget = null;
+    if (b.role === 'medic' && now > (b.medicThink || 0)) {
+      b.medicThink = now + 1200;
+      healTarget = findWoundedAlly(b);
+      b.healTarget = healTarget;
+    } else if (b.role === 'medic') healTarget = b.healTarget;
+    if (b.role === 'medic' && healTarget && !healTarget.dead) {
+      if (Math.hypot(healTarget.x - b.x, healTarget.y - b.y) < 95) {
+        if (now > (healTarget.medkitUntil || 0)) {
+          healTarget.medkitUntil = now + 20000;
+          healTarget.medkitNext = now;
+          evt('medkit', { x: healTarget.x, y: healTarget.y, by: b.name, side: b.side });
+        }
+        b.objective = { x: healTarget.x, y: healTarget.y, radius: 40, heal: true };
+      } else {
+        b.objective = { x: healTarget.x, y: healTarget.y, radius: 70, heal: true };
+      }
+    }
     if (!b.objective || now > (b.nextThink || 0)) {
       b.nextThink = now + 800 + Math.random() * 900;
       // Captains' order tags override the default plan most of the time.
@@ -1962,8 +2313,12 @@ function updateBots(dt, now) {
         if (now - (m.t || 0) > ORDER_TTL) continue;
         order = m;
       }
+      const ownMob = b.side === 'red' ? RED_MOB : BLUE_MOB;
       if (order && Math.random() < 0.72) {
         b.objective = { x: order.x, y: order.y, radius: 90, ordered: true };
+      } else if (b.fear > 0.6 && Math.random() < b.fear * 0.5) {
+        // Fear grows as health falls: a badly wounded bot breaks for home.
+        b.objective = { x: ownMob.x, y: ownMob.y, radius: 110, retreat: true };
       } else {
         // Attack the nearest hostile sector; fall back to the enemy MOB.
         let best = null, bd = 1e9;
@@ -1977,6 +2332,11 @@ function updateBots(dt, now) {
           best = { x: enemyMob.x, y: enemyMob.y, radius: 100 };
         }
         b.objective = best;
+      }
+      // Engineers knock together barricades at sectors they just took.
+      if (b.role === 'engineer') {
+        const fresh = capturePoints.find(cp => cp.owner === b.side && Math.hypot(cp.x - b.x, cp.y - b.y) < 260 && now - (cp.capturedAt || 0) < 120000);
+        if (fresh) botBuildBarricade(b, fresh, now);
       }
     }
     // find target
@@ -1999,6 +2359,17 @@ function updateBots(dt, now) {
       // Without a clear line of fire the bot must push around the cover
       // instead of standing still and shooting into a wall or boulder.
       const los = lineWalkable(b.x, b.y, target.x, target.y);
+      // Make for the nearest trench when caught in the open.
+      if (!isTrenchAt(b.x, b.y) && Math.random() < 0.012) {
+        const t0 = tileOf(b.x, b.y);
+        let bestT = null, bdT = 1e9;
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+          if (!trenches.has(idx(t0.tx + dx, t0.ty + dy))) continue;
+          const d = Math.hypot(dx, dy);
+          if (d < bdT) { bdT = d; bestT = { tx: t0.tx + dx, ty: t0.ty + dy }; }
+        }
+        if (bestT) b.objective = { x: (bestT.tx + 0.5) * TILE, y: (bestT.ty + 0.5) * TILE, radius: 16, trench: true };
+      }
       if (td > 240 || !los) {
         b._wantMove = true;
         if (los) {
@@ -2013,7 +2384,8 @@ function updateBots(dt, now) {
         b.lastShot = now;
         b.burst = (b.burst || 0) + 1;
         if (b.burst >= 4) { b.burst = 0; b.cooldown = 1400 + Math.random() * 1600; }
-        const spread = (Math.random() - 0.5) * 0.11;
+        // Nerves: spread widens with fear, and every bot has its own bias.
+        const spread = (Math.random() - 0.5) * (0.11 + b.fear * 0.2);
         const a = ang + spread;
         const inTrench = isTrenchAt(b.x, b.y);
         const z = inTrench ? 0 : b.z;
@@ -2037,13 +2409,16 @@ function updateBots(dt, now) {
         const d = Math.hypot(b.objective.x - b.x, b.objective.y - b.y);
         if (d > 45) {
           b._wantMove = true;
-          const spd = b.objective.ordered ? 84 : 72;
+          const spd = b.objective.ordered ? 84 : b.objective.retreat ? 92 : 72;
+          // Small lateral wander so columns do not march in perfect diagonals.
+          const sway = Math.sin(now * 0.0011 + (b.wander || 0)) * 0.16;
+          const aim = ang + sway;
           if (lineWalkable(b.x, b.y, b.objective.x, b.objective.y)) {
             b.path = null;
-            botStep(b, ang, spd, dt);
+            botStep(b, aim, spd, dt);
           } else {
             botSetPath(b, b.objective.x, b.objective.y, now, 2600);
-            if (!botFollow(b, dt, spd)) botStep(b, ang, spd, dt);
+            if (!botFollow(b, dt, spd)) botStep(b, aim, spd, dt);
           }
         }
       }
@@ -2161,9 +2536,10 @@ wss.on('connection', (ws) => {
     bushes: bushes.map(b => ({ id: b.id, x: b.x, y: b.y, r: Math.round(b.r) })),
     capturePoints: capturePoints.map(c => ({ ...c })),
     buildings: buildings.map(b => ({ ...b })),
-    vehicles: vehicles.map(v => ({ ...v })),
+    vehicles: vehicles.map(v => ({ ...v, crew: vehicleCrewInfo(v), seats: vehicleSeatCount(v) })),
     resources: resources.map(r => ({ ...r })),
     drops: drops.map(d => ({ ...d })),
+    blueprints: blueprints.map(bp => ({ ...bp })),
     war: warPublic(), ranks: RANKS, config: { weapons: WEAPONS, armor: ARMOR, buildings: BUILDINGS, vehicles: VEHICLES, captureRadius: CAPTURE_RADIUS },
     stock: teamStock, mode: WAR_DAYS > 0 ? `${WAR_DAYS}-day campaign` : `${WAR_MINUTES}-minute campaign`,
   });
@@ -2215,16 +2591,23 @@ function handle(ws, p, msg) {
         if (typeof msg.input.aimX === 'number') p.input.aimX = msg.input.aimX;
         if (typeof msg.input.aimY === 'number') p.input.aimY = msg.input.aimY;
         p.input.shoot = !!msg.input.shoot;
+        // Holding the build key raises the blueprint beside the soldier.
+        p.input.holdBuild = !!msg.input.holdBuild;
+        // An open field radio pins the soldier in place (movement is slowed
+        // and all other controls are locked until it is stowed).
+        p.input.radio = !!msg.input.radio;
       }
       break;
     case 'aim':
       if (typeof msg.angle === 'number') p.angle = msg.angle;
       break;
-    case 'shoot': p.input.shoot = true; break;
-    case 'reload': if (!p.dead) reloadWeapon(p, Date.now()); break;
-    case 'grenade': if (!p.dead) throwGrenade(p, Date.now()); break;
-    case 'interact': interact(p); break;
-    case 'vehicle': if (!p.dead) enterVehicle(p); break;
+    case 'shoot': if (!p.input.radio) p.input.shoot = true; break;
+    case 'switch_seat': switchSeat(p, +msg.seat || 0); break;
+    case 'reload': if (!p.dead && !p.input.radio) reloadWeapon(p, Date.now()); break;
+    case 'grenade': if (!p.dead && !p.input.radio) throwGrenade(p, Date.now()); break;
+    case 'interact': if (!p.input.radio) interact(p); break;
+    case 'vehicle': if (!p.dead && !p.input.radio) enterVehicle(p); break;
+    case 'mortar': if (!p.input.radio) callMortar(p, +msg.x || p.x, +msg.y || p.y); break;
     case 'chat': {
       const text = String(msg.text || '').slice(0, 180).trim();
       if (!text) return;
@@ -2240,7 +2623,7 @@ function handle(ws, p, msg) {
       break;
     }
     case 'marker': {
-      if (!p.side || p.dead) return;
+      if (!p.side || p.dead || p.input.radio) return;
       const order = !!msg.order && p.registered && p.rank >= 6;
       const now = Date.now();
       const kind = order ? 'order' : 'marker';
@@ -2262,11 +2645,11 @@ function handle(ws, p, msg) {
       break;
     }
     case 'barrage':
-      if (p.registered && p.rank >= 6) callBarrage(p, +msg.x || p.x, +msg.y || p.y);
+      if (p.registered && p.rank >= 6 && !p.input.radio) callBarrage(p, +msg.x || p.x, +msg.y || p.y);
       break;
-    case 'build': build(p, msg.kind, +msg.x, +msg.y, msg.horizontal); break;
-    case 'equip': equip(p, msg.weapon, msg.armor); break;
-    case 'vehicle_request': requestVehicle(p, msg.kind, +msg.x || p.x, +msg.y || p.y); break;
+    case 'build': if (!p.input.radio) build(p, msg.kind, +msg.x, +msg.y, msg.horizontal); break;
+    case 'equip': if (!p.input.radio) equip(p, msg.weapon, msg.armor); break;
+    case 'vehicle_request': if (!p.input.radio) requestVehicle(p, msg.kind, +msg.x || p.x, +msg.y || p.y); break;
     case 'spawn':
       if (p.side && (!p.dead || Date.now() - p.deathAt >= 3000)) {
         p.spawnPoint = msg.point || 'mob';
@@ -2324,7 +2707,9 @@ setInterval(() => {
 
       p.angle = Math.atan2(p.input.aimY - p.y, p.input.aimX - p.x);
       if (!p.vehicle) {
-        let spd = 132 * armorDef.speed * (p.input.sprint ? 1.32 : 1);
+        // Base infantry speed cut by 40% (people, not vehicles).
+        let spd = 79 * armorDef.speed * (p.input.sprint ? 1.32 : 1);
+        if (p.input.radio) spd *= 0.55; // one hand on the set, one on the rifle sling
         if (isTrenchAt(p.x, p.y)) spd *= 0.82;
         const tt = terrainAt(p.x, p.y);
         if (tt === T.MUD || tt === T.CRATER) spd *= 0.86;
@@ -2339,16 +2724,48 @@ setInterval(() => {
       } else {
         const v = p.vehicle;
         const def = VEHICLES[v.kind] || VEHICLES.truck;
-        if (len > 0) {
-          const targetAng = Math.atan2(my, mx);
-          v.angle = targetAng;
-          let spd = def.speed * (p.input.sprint ? 1.15 : 1);
-          const nx = v.x + mx * spd * dt, ny = v.y + my * spd * dt;
-          const tree = treeBlockAt(nx, ny, 15);
+        if (v.heading == null) v.heading = v.angle || 0;
+        // W/S are throttle and brake/reverse; A/D steer the hull. Steering
+        // authority grows with speed, so a parked vehicle cannot pivot.
+        const throttle = (p.input.up ? 1 : 0) - (p.input.down ? 1 : 0);
+        const steer = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
+        const tt = terrainAt(v.x, v.y);
+        // Surface modifiers: paved roads carry speed, churned soil and mud bog
+        // the machine down, and woodland is worst of all.
+        let surf = 1;
+        if (tt === T.ROAD) surf = 1.18;
+        else if (tt === T.BRIDGE) surf = 1.12;
+        else if (tt === T.MUD || tt === T.CRATER) surf = 0.68;
+        else if (tt === T.FOREST) surf = 0.78;
+        else if (tt === T.SAND) surf = 0.9;
+        else if (tt === T.DIRT) surf = 0.95;
+        const maxSpd = def.speed * surf;
+        const accel = maxSpd * 0.85;
+        const brake = maxSpd * 2.1;
+        if (throttle > 0) v.speed = Math.min(maxSpd, (v.speed || 0) + accel * dt);
+        else if (throttle < 0) {
+          if ((v.speed || 0) > 0) v.speed = Math.max(0, v.speed - brake * dt);
+          else v.speed = Math.max(-maxSpd * 0.45, (v.speed || 0) - accel * 0.7 * dt);
+        } else {
+          const drag = maxSpd * 1.3 * dt;
+          v.speed = (v.speed || 0) > 0 ? Math.max(0, v.speed - drag) : Math.min(0, v.speed + drag);
+        }
+        if (steer !== 0 && Math.abs(v.speed) > 1) {
+          const grip = 0.35 + 0.65 * Math.min(1, Math.abs(v.speed) / (maxSpd * 0.6));
+          v.heading += steer * 1.9 * grip * dt * (v.speed < 0 ? -1 : 1);
+        }
+        v.angle = v.heading;
+        const travel = (v.speed || 0) * dt;
+        if (Math.abs(travel) > 0.05) {
+          const nx = v.x + Math.cos(v.heading) * travel;
+          const ny = v.y + Math.sin(v.heading) * travel;
+          let tree = treeBlockAt(nx, ny, 15);
+          if (!tree && Math.abs(travel) > 30) tree = treeBlockAt((v.x + nx) / 2, (v.y + ny) / 2, 15);
           if (tree) {
             // Heavy machinery ploughs through timber. A tank fells a tree in
             // one pass; trucks need a couple of hits and take more damage.
             const heavy = v.kind === 'tank' ? 2.1 : v.kind === 'armored_car' ? 1.2 : 0.65;
+            const spd = Math.abs(v.speed);
             tree.hp = Math.max(0, tree.hp - spd * 0.42 * heavy);
             evt('tree_hit', { id: tree.id, hp: Math.round(tree.hp), maxHp: tree.maxHp });
             if (tree.hp <= 0) evt('tree_felled', { id: tree.id, x: tree.x, y: tree.y });
@@ -2357,19 +2774,25 @@ setInterval(() => {
               evt('vehicle_impact', { x: v.x, y: v.y, kind: v.kind, side: v.side, heavy: v.kind === 'tank', tree: true });
               damageVehicle(v, spd * 0.055 * heavy, p, 'collision');
             }
-          } else if (vehicleWalkable(nx, ny, true)) {
+            v.speed *= 0.45;
+          } else if (vehicleCanMove(v, nx, ny)) {
             v.x = nx; v.y = ny;
-          } else if (!v.lastImpact || now - v.lastImpact > 420) {
-            // solid masonry, boulders and river banks punish careless driving
-            v.lastImpact = now;
-            evt('vehicle_impact', { x: v.x, y: v.y, kind: v.kind, side: v.side, heavy: v.kind === 'tank', tree: false });
-            damageVehicle(v, spd * 0.045, p, 'collision');
+          } else {
+            // solid masonry, boulders, walls and river banks punish careless driving
+            const spd = Math.abs(v.speed);
+            if (!v.lastImpact || now - v.lastImpact > 420) {
+              v.lastImpact = now;
+              evt('vehicle_impact', { x: v.x, y: v.y, kind: v.kind, side: v.side, heavy: v.kind === 'tank', tree: false });
+              damageVehicle(v, spd * 0.055, p, 'collision');
+            }
+            v.speed = -v.speed * 0.15;
           }
-          if (p.registered && db.users[p.username]) { db.users[p.username].stats.kmDriven += (spd * dt) / 1000; dirty = true; }
+          if (p.registered && db.users[p.username]) { db.users[p.username].stats.kmDriven += (Math.abs(v.speed) * dt) / 1000; dirty = true; }
         }
+        vehicleRunOver(v, now);
         p.x = v.x; p.y = v.y;
         p.z = 0;
-        if (p.input.shoot && def.gun) {
+        if (p.input.shoot && !p.input.radio && def.gun && p.seat === 0) {
           // vehicle MG / APC autocannon
           const apc = v.kind === 'apc';
           if (apc) {
@@ -2389,9 +2812,11 @@ setInterval(() => {
             v.cooldown = now;
             if (apc) v.magAmmo--;
             const a = p.angle + (Math.random() - 0.5) * (apc ? 0.06 : 0.09);
+            // Start the round at the muzzle, but close enough that an enemy
+            // hugging the hull is still inside its swept path.
             bullets.push({
               id: nextId++, owner: p.id, ownerName: p.name, side: p.side,
-              x: v.x + Math.cos(a) * 30, y: v.y + Math.sin(a) * 30, z: 0,
+              x: v.x + Math.cos(a) * 8, y: v.y + Math.sin(a) * 8, z: 0,
               vx: Math.cos(a) * 1000 * BULLET_SPEED_MULT, vy: Math.sin(a) * 1000 * BULLET_SPEED_MULT,
               dmg: apc ? 26 : 22, life: 1 / BULLET_SPEED_MULT, kind: apc ? 'apc' : 'mg',
               splash: apc ? 36 : 0, splashDmg: apc ? 15 : 0,
@@ -2402,7 +2827,7 @@ setInterval(() => {
       }
       if (!p.vehicle) {
         p.z = isTrenchAt(p.x, p.y) ? -1 : 0;
-        if (p.input.shoot) fire(p, now);
+        if (p.input.shoot && !p.input.radio) fire(p, now);
       }
       depositAtPoint(p, false, true);
       pickupDrops(p);
@@ -2411,6 +2836,9 @@ setInterval(() => {
     updateBots(dt, now);
     updateTurrets(dt, now);
     updateCapture(dt);
+    updateBlueprints(dt);
+    updateHospitals(dt, now);
+    applyMedkits(now);
     updateMobDamage(dt);
 
     // Conquest score: each owned sector accumulates pressure every second.
@@ -2460,7 +2888,7 @@ setInterval(() => {
       let hit = false;
       for (const t of players.values()) {
         if (t.dead || t.side === b.side || !t.side || t.vehicle) continue;
-        if (Math.hypot(t.x - b.x, t.y - b.y) > 15) continue;
+        if (segmentDistance(px, py, b.x, b.y, t.x, t.y) > 15) continue;
         // A soldier hugging the trench floor is below the bullet's flight path.
         if (isTrenchAt(t.x, t.y) && (t.exposed || 0) <= now) continue;
         damagePlayer(t, b.dmg, findOwner(b.owner), b.kind);
@@ -2469,7 +2897,7 @@ setInterval(() => {
       if (!hit) {
         for (const t of bots) {
           if (t.dead || t.side === b.side) continue;
-          if (Math.hypot(t.x - b.x, t.y - b.y) > 15) continue;
+          if (segmentDistance(px, py, b.x, b.y, t.x, t.y) > 15) continue;
           if (isTrenchAt(t.x, t.y) && (t.exposed || 0) <= now) continue;
           damageBot(t, b.dmg, findOwner(b.owner), b.kind);
           hit = true; break;
@@ -2478,7 +2906,7 @@ setInterval(() => {
       if (!hit) {
         for (const v of vehicles) {
           if (v.side === b.side || v.hp <= 0) continue;
-          if (Math.hypot(v.x - b.x, v.y - b.y) > 26) continue;
+          if (segmentDistance(px, py, b.x, b.y, v.x, v.y) > 26) continue;
           damageVehicle(v, b.dmg, findOwner(b.owner), b.kind);
           hit = true; break;
         }
@@ -2554,10 +2982,11 @@ setInterval(() => {
     bcast({
       type: 'state', t: now,
       players: [...players.values()].map(sanitize),
-      bots: bots.map(b => ({ id: b.id, name: b.name, side: b.side, x: Math.round(b.x), y: Math.round(b.y), z: b.z, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, angle: b.angle, dead: b.dead, kills: b.kills | 0, deaths: b.deaths | 0, assists: b.assists | 0 })),
+      bots: bots.map(b => ({ id: b.id, name: b.name, side: b.side, x: Math.round(b.x), y: Math.round(b.y), z: b.z, hp: Math.max(0, Math.round(b.hp)), maxHp: b.maxHp, angle: b.angle, dead: b.dead, kills: b.kills | 0, deaths: b.deaths | 0, assists: b.assists | 0, role: b.role, uniform: b.uniform, vehicle: b.vehicle || null })),
       bullets: bullets.map(b => ({ id: b.id, x: Math.round(b.x), y: Math.round(b.y), z: b.z, side: b.side, vx: b.vx, vy: b.vy })),
       grenades: grenades.map(g => ({ id: g.id, x: Math.round(g.x), y: Math.round(g.y), fuse: g.fuse })),
-      vehicles: vehicles.map(v => ({ id: v.id, kind: v.kind, side: v.side, x: Math.round(v.x), y: Math.round(v.y), angle: v.angle, hp: Math.max(0, Math.round(v.hp)), maxHp: v.maxHp, driver: v.driver, cargo: v.cargo, ammo: v.ammo, magAmmo: v.magAmmo })),
+      vehicles: vehicles.map(v => ({ id: v.id, kind: v.kind, side: v.side, x: Math.round(v.x), y: Math.round(v.y), angle: v.angle, heading: v.heading, speed: Math.round(v.speed || 0), hp: Math.max(0, Math.round(v.hp)), maxHp: v.maxHp, driver: v.driver, cargo: v.cargo, ammo: v.ammo, magAmmo: v.magAmmo, crew: vehicleCrewInfo(v), seats: vehicleSeatCount(v) })),
+      blueprints: blueprints.map(bp => ({ id: bp.id, kind: bp.kind, side: bp.side, x: Math.round(bp.x), y: Math.round(bp.y), w: bp.w, h: bp.h, tx: bp.tx, ty: bp.ty, angle: bp.angle, by: bp.by, progress: bp.progress, duration: bp.duration })),
       capturePoints: capturePoints.map(c => ({ id: c.id, owner: c.owner, progress: Math.round(c.progress || 0), contesting: c.contesting,
         stock: c.stock ? { scrap: Math.floor(c.stock.scrap), fuel: Math.floor(c.stock.fuel), ammo: Math.floor(c.stock.ammo) } : null })),
       buildings: buildings.map(b => ({ id: b.id, hp: Math.round(b.hp) })),

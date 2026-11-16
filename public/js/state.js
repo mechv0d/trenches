@@ -19,7 +19,7 @@ const S = {
   ws: null, connected: false, token: null, username: null, authed: false, guest: false,
   me: null, world: null, terrain: null, terrainCanvas: null, terrainCtx: null,
   trenches: new Set(), config: null, ranks: [], mode: 'menu', serverMode: '',
-  players: [], bots: [], bullets: [], grenades: [], vehicles: [], buildings: [],
+  players: [], bots: [], bullets: [], grenades: [], vehicles: [], buildings: [], blueprints: [],
   resources: [], drops: [], cps: [], war: null, stock: { red: {}, blue: {} }, markers: [],
   deployed: false, chosenSide: null, sideLocked: false, spawnPoint: 'mob', deathUntil: 0, warEndUntil: 0,
   pred: { x: 0, y: 0, ang: 0 }, initialized: false, connectionLost: false,
@@ -28,7 +28,9 @@ const S = {
   cam: { x: 0, y: 0 }, shake: 0,
   mouse: { x: innerWidth / 2, y: innerHeight / 2, down: false },
   keys: {}, touch: { active: false, dx: 0, dy: 0, fire: false, id: null },
-  chatAll: [], knownFreqs: [], killFeed: [], selectedBuild: null, bridgeAxis: null, artillery: false,
+  chatAll: [], knownFreqs: [], killFeed: [], selectedBuild: null, bridgeAxis: null, artillery: false, mortar: false,
+  gfx: { grain: true, fog: true, shake: true },
+  buildMenuAnchor: null, mortarTargets: [], radial: { open: false, cb: null },
   lastSend: 0, lastHud: 0, lastDeploy: 0, lastState: 0, mute: false,
   audio: null, ambience: null, lastShotSound: 0, menuT: 0, ping: 0, lastPing: 0,
   engineAudio: new Map(), engineLast: new Map(), stepT: 0, stepAlt: false,
@@ -210,6 +212,21 @@ function sfxCrash(distance, heavy) {
   const og = S.audio.createGain(); og.gain.setValueAtTime((heavy ? 0.28 : 0.15) * att, now);
   og.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
   o.connect(og); og.connect(S.audio.destination); o.start(now); o.stop(now + 0.5);
+}
+/* Falling mortar shell: a thin descending whistle, louder as it drops. */
+function sfxWhistle(distance) {
+  if (!S.audio || S.mute) return;
+  if ((distance || 0) > 1800) return;
+  const now = S.audio.currentTime;
+  const att = clamp(1 - (distance || 0) / 1600, 0.05, 1);
+  const o = S.audio.createOscillator(); o.type = 'sine';
+  o.frequency.setValueAtTime(1500, now);
+  o.frequency.exponentialRampToValueAtTime(420, now + 0.55);
+  const g = S.audio.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.09 * att, now + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+  o.connect(g); g.connect(S.audio.destination); o.start(now); o.stop(now + 0.62);
 }
 function sfxHit(kill) {
   withAudio((a) => {
@@ -467,7 +484,10 @@ function handleMessage(msg) {
     case 'freq_set': onFreqSet(msg); break;
     case 'known_freq': addKnownFreq(msg.freq); break;
     case 'profile': renderProfile(msg.user); break;
-    case 'kit': if (S.me) { S.me.weapon = msg.weapon; S.me.armor = msg.armor; S.me.ammo = msg.ammo; } break;
+    case 'kit': if (S.me) { S.me.weapon = msg.weapon; S.me.armor = msg.armor; S.me.ammo = msg.ammo; }
+      if (!$('modalArmory').classList.contains('hidden')) renderArmory();
+      updateHud();
+      break;
     case 'vehicle': onVehicleMsg(msg); break;
     case 'gather': addFloat(myPos().x, myPos().y - 24, `+${msg.amount} ${msg.resource.toUpperCase()}`, '#d9a441'); break;
     case 'deposit': {
@@ -487,6 +507,13 @@ function handleMessage(msg) {
     case 'building_added': addBuilding(msg.building); break;
     case 'vehicle_added': addVehicle(msg.vehicle); break;
     case 'trench_added': addTrenchTile(msg.tx, msg.ty); break;
+    case 'blueprint': addBlueprint(msg.blueprint); break;
+    case 'blueprint_done': S.blueprints = S.blueprints.filter(bp => bp.id !== msg.id); break;
+    case 'vehicle_crew': {
+      const v = S.vehicles.find(x => x.id === msg.id);
+      if (v) v.crew = msg.crew;
+      break;
+    }
     case 'tree_hit': {
       const t = S.trees.find(x => x.id === msg.id);
       if (t) t.hp = msg.hp;
@@ -526,6 +553,7 @@ function onInit(msg) {
   S.resources = msg.resources || [];
   S.resourceMeta = new Map(S.resources.map(r => [r.id, r]));
   S.drops = msg.drops || [];
+  S.blueprints = msg.blueprints || [];
   S.war = msg.war;
   S.stock = msg.stock;
   S.structures = (msg.structures || []).map(st => ({ ...st, _roofA: 1 }));
@@ -575,6 +603,7 @@ function onState(msg) {
   }
   S.resources = Array.from(S.resourceMeta.values());
   S.drops = msg.drops || [];
+  S.blueprints = msg.blueprints || [];
   S.war = msg.war;
   S.stock = msg.stock;
   S.markers = msg.markers || [];
@@ -632,6 +661,12 @@ function addVehicle(v) {
   if (!v || v.id == null) return;
   S.vehicleMeta.set(v.id, { ...v });
   if (!S.vehicles.some(x => x.id === v.id)) S.vehicles.push({ ...v });
+}
+
+function addBlueprint(bp) {
+  if (!bp || bp.id == null) return;
+  const i = S.blueprints.findIndex(x => x.id === bp.id);
+  if (i >= 0) S.blueprints[i] = bp; else S.blueprints.push(bp);
 }
 
 function onEvent(ev) {
@@ -697,6 +732,26 @@ function onEvent(ev) {
         addSystem('Friendly barrage incoming. Danger close.', 'warn');
       } else {
         addSystem('Enemy artillery falling!', 'warn');
+      }
+      break;
+    case 'mortar_incoming': {
+      const my = myPos();
+      const d = dist(ev.x, ev.y, my.x, my.y);
+      S.mortarTargets.push({ x: ev.x, y: ev.y, side: ev.side, at: performance.now() + 6800 });
+      if (ev.side === (S.me && S.me.side)) {
+        toast('MORTAR STRIKE INBOUND — SHELLS FALLING', 'amber');
+        addSystem(`${ev.by || 'A spotter'} called mortars onto the grid.`, 'warn');
+      } else {
+        toast('ENEMY MORTARS — TAKE COVER', 'red');
+        addSystem('Incoming mortar fire!', 'warn');
+      }
+      for (let i = 0; i < 7; i++) setTimeout(() => sfxWhistle(d), 2150 + i * 620);
+      break;
+    }
+    case 'medkit':
+      addFloat(ev.x, ev.y - 26, 'MEDKIT +', '#7fbf6a');
+      if (S.me && dist(ev.x, ev.y, myPos().x, myPos().y) < 500) {
+        S.rings.push({ x: ev.x, y: ev.y, r: 6, max: 46, life: 0.9, maxLife: 0.9, color: 'rgba(127,191,106,.8)' });
       }
       break;
     case 'bark':
@@ -793,6 +848,15 @@ function loadSession() {
     if (s && s.token) { S.token = s.token; S.username = s.username; S.pendingAuth = true; }
   } catch { /* ignore */ }
 }
+function loadGfx() {
+  try {
+    const g = JSON.parse(localStorage.getItem('trenches_gfx') || 'null');
+    if (g && typeof g === 'object') Object.assign(S.gfx, g);
+  } catch { /* ignore */ }
+}
+function saveGfx() {
+  try { localStorage.setItem('trenches_gfx', JSON.stringify(S.gfx)); } catch { /* ignore */ }
+}
 function authMsg(text, ok) {
   const el = $('authMsg');
   el.textContent = text;
@@ -832,8 +896,13 @@ function keydown(e) {
   if (c === 'KeyA' || c === 'ArrowLeft') { S.keys.a = true; e.preventDefault(); return; }
   if (c === 'KeyD' || c === 'ArrowRight') { S.keys.d = true; e.preventDefault(); return; }
   if (c === 'ShiftLeft' || c === 'ShiftRight') { S.keys.shift = true; return; }
-  if (c === 'Escape') { togglePause(); return; }
+  if (c === 'Escape') {
+    if (S.radial.open) { closeRadial(); return; }
+    togglePause(); return;
+  }
   if (S.mode !== 'hud' || !S.deployed) return;
+  // An open radio in the field locks every control except movement.
+  if (radioRestricted()) return;
   if (e.repeat) return;
   switch (c) {
     case 'KeyR':
@@ -846,12 +915,21 @@ function keydown(e) {
       e.preventDefault(); break;
     case 'KeyG': sendMsg({ type: 'grenade' }); e.preventDefault(); break;
     case 'KeyE': S.keys.e = true; sendMsg({ type: 'interact' }); e.preventDefault(); break;
-    case 'KeyF': sendMsg({ type: 'vehicle' }); e.preventDefault(); break;
-    case 'KeyV': placeMarker(false); e.preventDefault(); break;
+    case 'KeyF':
+      S.keys.f = true;
+      // Hold F beside a blueprint to build; otherwise F mounts/dismounts.
+      if (!nearBlueprint()) sendMsg({ type: 'vehicle' });
+      e.preventDefault(); break;
+    case 'KeyV':
+      if (S.me && S.me.vehicle) openSeatRadial();
+      else placeMarker(false);
+      e.preventDefault(); break;
     case 'KeyN': placeMarker(true); e.preventDefault(); break;
     case 'KeyM': toggleMap(); e.preventDefault(); break;
     case 'KeyB': openBuild(); e.preventDefault(); break;
     case 'KeyH': openArmory(); e.preventDefault(); break;
+    case 'KeyC': openVehicles(); e.preventDefault(); break;
+    case 'KeyZ': startMortar(); e.preventDefault(); break;
     case 'KeyP': openProfile(); e.preventDefault(); break;
     case 'KeyT': startBarrage(); e.preventDefault(); break;
     case 'Tab': toggleScoreboard(); e.preventDefault(); break;
@@ -866,6 +944,7 @@ function keyup(e) {
   else if (c === 'KeyD' || c === 'ArrowRight') S.keys.d = false;
   else if (c === 'ShiftLeft' || c === 'ShiftRight') S.keys.shift = false;
   else if (c === 'KeyE') S.keys.e = false;
+  else if (c === 'KeyF') S.keys.f = false;
 }
 function bindInput() {
   window.addEventListener('keydown', keydown);
@@ -878,6 +957,8 @@ function bindInput() {
     if (e.button !== 0) return;
     initAudio();
     if (S.mode !== 'hud' || !S.deployed) return;
+    if (radioRestricted()) return;
+    if (S.mortar) { fireMortarAtMouse(); return; }
     if (S.selectedBuild) { placeBuildAtMouse(); return; }
     if (S.artillery) { fireBarrageAtMouse(); return; }
     S.mouse.down = true;
@@ -887,7 +968,9 @@ function bindInput() {
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (S.selectedBuild) { S.selectedBuild = null; toast('Blueprint cancelled', 'amber'); }
-    if (S.artillery) { S.artillery = false; }
+    if (S.artillery) { S.artillery = false; toast('Artillery mission cancelled', 'amber'); }
+    if (S.mortar) { S.mortar = false; toast('Mortar mission cancelled', 'amber'); }
+    if (S.radial.open) closeRadial();
   });
   window.addEventListener('wheel', (e) => {
     if (S.mode !== 'hud' || !S.deployed) return;
@@ -957,6 +1040,7 @@ function sendInput() {
   if (!S.ws || S.ws.readyState !== 1 || !S.me) return;
   const p = myPos();
   const aim = S.mouseWorld || { x: p.x, y: p.y };
+  const locked = radioRestricted();
   sendMsg({
     type: 'input',
     input: {
@@ -964,10 +1048,12 @@ function sendInput() {
       down: !!(S.keys.s || S.keys.arrowdown || (S.touch.active && S.touch.dy > 0.25)),
       left: !!(S.keys.a || S.keys.arrowleft || (S.touch.active && S.touch.dx < -0.25)),
       right: !!(S.keys.d || S.keys.arrowright || (S.touch.active && S.touch.dx > 0.25)),
-      sprint: !!S.keys.shift,
-      interact: !!S.keys.e || !!S.touch.interact,
+      sprint: !!S.keys.shift && !locked,
+      interact: (!!S.keys.e || !!S.touch.interact) && !locked,
+      holdBuild: !!S.keys.f && !!nearBlueprint(),
+      radio: locked,
       aimX: aim.x, aimY: aim.y,
-      shoot: S.mouse.down || S.touch.fire,
+      shoot: (S.mouse.down || S.touch.fire) && !locked,
     },
   });
   sendMsg({ type: 'aim_now' });

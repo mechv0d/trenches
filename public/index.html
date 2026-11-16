@@ -104,7 +104,7 @@
 
     <div class="deploy-right">
       <div class="map-frame">
-        <canvas id="deployMap" width="760" height="532"></canvas>
+        <canvas id="deployMap" width="1520" height="1064"></canvas>
         <div class="map-scan"></div>
       </div>
       <div class="map-legend">
@@ -166,6 +166,8 @@
     <div class="action-bar">
       <button class="act" data-act="build"><b>B</b><span>BUILD</span></button>
       <button class="act" data-act="armory"><b>H</b><span>ARMORY</span></button>
+      <button class="act" data-act="vehicles"><b>C</b><span>VEHICLES</span></button>
+      <button class="act" data-act="mortar"><b>Z</b><span>MORTAR</span></button>
       <button class="act" data-act="map"><b>M</b><span>MAP</span></button>
       <button class="act" data-act="score"><b>TAB</b><span>ROSTER</span></button>
       <button class="act" data-act="marker"><b>V</b><span>MARK</span></button>
@@ -185,6 +187,9 @@
       </div>
     </div>
   </div>
+
+  <!-- vehicle crew strip: transparent, bottom centre -->
+  <div class="seat-panel hidden" id="seatPanel"></div>
 
   <div class="rank-track">
     <div class="rt-head"><span id="hudRank">GUEST INFANTRY</span><span id="hudXpLabel">ENLIST TO EARN RANKS</span></div>
@@ -269,7 +274,15 @@
     <div class="card-grid" id="weaponCards"></div>
     <div class="section-title">ARMOR SETS</div>
     <div class="card-grid" id="armorCards"></div>
-    <div class="section-title">VEHICLES <small>must be at MOB / depot</small></div>
+  </div>
+</section>
+
+<!-- ===================== VEHICLES MODAL ===================== -->
+<section id="modalVehicles" class="modal hidden">
+  <div class="modal-card wide">
+    <header><h3>VEHICLES</h3><button class="close" data-close="modalVehicles">✕</button></header>
+    <div class="modal-sub">Transport is requisitioned at a MOB or Vehicle Depot only. Crew seats are shared — press V aboard to switch.</div>
+    <div class="stock-strip" id="vehicleStock"></div>
     <div class="card-grid" id="vehicleCards"></div>
   </div>
 </section>
@@ -299,22 +312,46 @@
 <section id="pause" class="modal hidden">
   <div class="modal-card">
     <header><h3>FIELD MENU</h3><button class="close" data-close="pause">✕</button></header>
-    <div class="pause-buttons">
-      <button id="btnResume" class="primary">RESUME</button>
-      <button id="btnSound" class="ghost">SOUND: ON</button>
-      <button id="btnLeave" class="ghost danger">LEAVE THE FRONT</button>
+    <div class="pause-tabs">
+      <button data-ptab="main" class="on">MAIN</button>
+      <button data-ptab="graphics">GRAPHICS</button>
+      <button data-ptab="controls">CONTROLS</button>
     </div>
-    <div class="controls-list">
-      <div><b>WASD</b> move</div><div><b>MOUSE</b> aim / fire</div>
-      <div><b>R</b> reload</div><div><b>G</b> grenade</div>
-      <div><b>E</b> interact / board</div><div><b>F</b> enter vehicle</div>
-      <div><b>V</b> marker</div><div><b>N</b> order (Captain+)</div>
-      <div><b>M</b> theatre map</div><div><b>TAB</b> field roster</div>
-      <div><b>B</b> build</div><div><b>H</b> armory</div>
-      <div><b>T</b> artillery (Captain+)</div><div><b>ENTER</b> field radio</div>
+    <div class="pause-pane" id="pauseMain">
+      <div class="pause-buttons">
+        <button id="btnResume" class="primary">RESUME</button>
+        <button id="btnPauseProfile" class="ghost">PROFILE / SERVICE RECORD</button>
+        <button id="btnSound" class="ghost">SOUND: ON</button>
+        <button id="btnLeave" class="ghost danger">EXIT TO MAIN MENU</button>
+      </div>
+    </div>
+    <div class="pause-pane hidden" id="pauseGraphics">
+      <div class="modal-sub">Display options are stored on this machine.</div>
+      <label class="gfx-row"><input type="checkbox" id="gfxGrain" checked/> <span>THIN WHITE SCANLINES</span></label>
+      <label class="gfx-row"><input type="checkbox" id="gfxFog" checked/> <span>FOG OF WAR</span></label>
+      <label class="gfx-row"><input type="checkbox" id="gfxShake" checked/> <span>SCREEN SHAKE</span></label>
+    </div>
+    <div class="pause-pane hidden" id="pauseControls">
+      <div class="controls-list">
+        <div><b>WASD</b> move</div><div><b>MOUSE</b> aim / fire</div>
+        <div><b>R</b> reload</div><div><b>G</b> grenade</div>
+        <div><b>E</b> interact / board</div><div><b>F</b> vehicle · hold to build</div>
+        <div><b>V</b> marker / seat menu</div><div><b>N</b> order (Captain+)</div>
+        <div><b>M</b> theatre map</div><div><b>TAB</b> field roster</div>
+        <div><b>B</b> build</div><div><b>H</b> armory</div>
+        <div><b>C</b> vehicles</div><div><b>Z</b> mortar strike</div>
+        <div><b>T</b> artillery (Captain+)</div><div><b>ENTER</b> field radio</div>
+      </div>
     </div>
   </div>
 </section>
+
+<!-- ===================== RADIAL MENU ===================== -->
+<div class="radial hidden" id="radial">
+  <div class="radial-ring"></div>
+  <div class="radial-items" id="radialItems"></div>
+  <div class="radial-label" id="radialLabel"></div>
+</div>
 
 <script src="js/state.js"></script>
 <script src="js/render.js"></script>
