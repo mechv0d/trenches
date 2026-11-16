@@ -1,0 +1,70 @@
+{
+  "users": {
+    "farmoff12@gmail.com": {
+      "passwordHash": "$2a$10$HYUzhil4FUpTKfW4PE6P0.yI1Ge/MKW9VcglLMqA.N.HcpmHm.tCu",
+      "registered": true,
+      "side": null,
+      "rank": 0,
+      "xp": 0,
+      "stats": {
+        "kills": 0,
+        "deaths": 0,
+        "buildings": 0,
+        "kmWalked": 0,
+        "kmDriven": 0,
+        "warsWon": 0,
+        "warsLost": 0,
+        "warsTotal": 0,
+        "itemsProduced": 0
+      },
+      "createdAt": 1794727189461,
+      "sideLocked": false
+    },
+    "TestSoldier": {
+      "passwordHash": "$2a$10$arnLRGepk00JGKLGWamuuO0XaBpTKPzyYS333ZrLEoD7VS6tZmcJa",
+      "token": "ab5034d5-b805-4e58-86fe-8366c7c36b0b",
+      "registered": true,
+      "side": null,
+      "rank": 0,
+      "xp": 0,
+      "stats": {
+        "kills": 14,
+        "deaths": 2,
+        "buildings": 4,
+        "kmWalked": 31.653910358400466,
+        "kmDriven": 0,
+        "warsWon": 0,
+        "warsLost": 0,
+        "warsTotal": 0,
+        "itemsProduced": 4,
+        "captures": 2
+      },
+      "createdAt": 1794728629930,
+      "sideLocked": false
+    },
+    "farmoff12@gmail.co": {
+      "passwordHash": "$2a$10$a3U1OMZp.bceinyaVY5d6uF3wRhXSgkeMNqGiy/gKxVZm7OI0FsIe",
+      "token": "723f6613-caf4-4814-abfb-d050427a7a5f",
+      "registered": true,
+      "side": null,
+      "rank": 0,
+      "xp": 0,
+      "stats": {
+        "kills": 147,
+        "deaths": 9,
+        "assists": 79,
+        "buildings": 82,
+        "kmWalked": 85.2239871098865,
+        "kmDriven": 39.89946899999862,
+        "warsWon": 4,
+        "warsLost": 1,
+        "warsTotal": 5,
+        "itemsProduced": 16,
+        "captures": 4
+      },
+      "createdAt": 1794731580269,
+      "sideLocked": false
+    }
+  },
+  "wars": 37
+}

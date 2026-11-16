@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<meta name="theme-color" content="#14160f"/>
+<title>TRENCHES — A Global Campaign</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+<div id="lowHp"></div>
+<div id="grain"></div>
+
+<!-- ===================== MAIN MENU ===================== -->
+<section id="menu" class="screen">
+  <div class="menu-sky"></div>
+  <div class="menu-silhouette"></div>
+  <div class="menu-inner">
+    <header class="brand">
+      <div class="brand-kicker">THE GREAT WAR · 1914 — 1918</div>
+      <h1>TRENCHES</h1>
+      <div class="brand-rule"><span></span><b>A GLOBAL CAMPAIGN</b><span></span></div>
+    </header>
+
+    <div class="menu-grid">
+      <div class="menu-side">
+        <div class="front-status" id="frontStatus">
+          <div class="fs-row"><span>FRONT STATUS</span><b id="fsOnline">—</b></div>
+          <div class="fs-bar"><i id="fsRed"></i><i id="fsBlue"></i></div>
+          <div class="fs-row muted"><span id="fsMode">—</span><span id="fsTime">—</span></div>
+        </div>
+        <div class="quote">
+          “The war will be over by Christmas.”
+          <small>— everyone, 1914</small>
+        </div>
+      </div>
+
+      <div class="menu-panel">
+        <div class="panel-head">IDENTIFICATION</div>
+        <label>SOLDIER NAME</label>
+        <input id="username" maxlength="18" autocomplete="username" placeholder="e.g. J. Kowalski"/>
+        <label>PASSWORD</label>
+        <input id="password" type="password" maxlength="64" autocomplete="current-password" placeholder="••••••••"/>
+        <div class="btn-row">
+          <button id="btnLogin" class="primary">SIGN IN</button>
+          <button id="btnRegister" class="ghost">ENLIST</button>
+        </div>
+        <div class="divider"><span>OR</span></div>
+        <button id="btnGuest" class="guest">PLAY AS GUEST INFANTRY</button>
+        <div class="auth-msg" id="authMsg"></div>
+        <div class="menu-foot">
+          Guests fight as ordinary infantry. Enlisted soldiers earn ranks, crew vehicles,
+          construct defences and run the war economy.
+        </div>
+      </div>
+    </div>
+    <footer class="menu-footer">
+      <span>SERVER: HOMEFRONT-01</span>
+      <span>LOW-POP BONUS ACTIVE</span>
+      <span>BUILD 1.0.0</span>
+    </footer>
+  </div>
+</section>
+
+<!-- ===================== DEPLOY ===================== -->
+<section id="deploy" class="screen hidden">
+  <header class="deploy-top">
+    <div>
+      <div class="kicker">OPERATION</div>
+      <div class="deploy-title">DEPLOYMENT</div>
+    </div>
+    <div class="deploy-war" id="deployWar"></div>
+    <button id="btnProfileTop" class="ghost small">SERVICE RECORD</button>
+  </header>
+
+  <div class="deploy-grid">
+    <div class="deploy-left">
+      <div class="section-title">1 · CHOOSE YOUR ARMY FOR THIS ROUND</div>
+      <div class="side-cards">
+        <button class="side-card red" id="pickRed">
+          <div class="emblem">✦</div>
+          <div class="side-name">RED ARMY</div>
+          <div class="side-sub" id="redMeta">—</div>
+          <div class="side-lock" id="redLock"></div>
+        </button>
+        <button class="side-card blue" id="pickBlue">
+          <div class="emblem">✦</div>
+          <div class="side-name">BLUE ARMY</div>
+          <div class="side-sub" id="blueMeta">—</div>
+          <div class="side-lock" id="blueLock"></div>
+        </button>
+      </div>
+
+      <div class="section-title">2 · SPAWN POINT</div>
+      <div class="spawn-list" id="spawnList"></div>
+
+      <div class="rank-card" id="rankCard"></div>
+
+      <button id="btnDeploy" class="primary big" disabled>DEPLOY TO THE FRONT</button>
+      <button id="btnArmory" class="ghost wide">ARMORY &amp; KIT</button>
+    </div>
+
+    <div class="deploy-right">
+      <div class="map-frame">
+        <canvas id="deployMap" width="760" height="532"></canvas>
+        <div class="map-scan"></div>
+      </div>
+      <div class="map-legend">
+        <span><i class="dot red"></i>RED</span>
+        <span><i class="dot blue"></i>BLUE</span>
+        <span><i class="dot neutral"></i>NEUTRAL</span>
+        <span><i class="line"></i>FRONT LINE</span>
+      </div>
+      <div class="deploy-note" id="deployNote"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== HUD ===================== -->
+<section id="hud" class="hidden">
+  <header class="topbar">
+    <div class="tb-center">
+      <div class="tb-timer" id="hudTimer">--:--</div>
+      <div class="tb-sub"><span id="hudPop">LOW-POP</span></div>
+      <div class="tb-score"><span class="r" id="hudRedScore">0</span><span class="sep">–</span><span class="b" id="hudBlueScore">0</span><span class="lim" id="hudScoreLimit">/1000</span></div>
+      <div class="sector-row" id="sectorRow"></div>
+    </div>
+  </header>
+
+  <div class="near-stock" id="nearStock"></div>
+
+  <div class="hud-right">
+    <div class="minimap-wrap">
+      <canvas id="minimap" width="260" height="182"></canvas>
+      <div class="minimap-label">SECTOR MAP</div>
+    </div>
+  </div>
+
+  <div class="log-panel radio-panel hidden" id="radioPanel">
+    <div class="log-tabs"><b>FIELD RADIO</b><span id="radioChannel">000–000</span><button id="btnRadioClose" class="close-radio">✕</button></div>
+    <div class="log" id="chatLog"></div>
+    <div class="radio-row">
+      <input id="freqHi" type="number" min="0" max="999" value="0" title="High frequency"/>
+      <span>–</span>
+      <input id="freqLo" type="number" min="0" max="999" value="0" title="Low frequency"/>
+      <button id="btnTune" class="mini">TUNE</button>
+    </div>
+    <div class="chat-row">
+      <input id="chatInput" maxlength="180" placeholder="transmit to channel…"/>
+      <button id="btnSend" class="mini">SEND</button>
+    </div>
+    <div class="known-freqs" id="knownFreqs"></div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="bottom-left">
+      <button class="radio-toggle" id="btnRadio"><span class="rt-led"></span>FIELD RADIO <b id="radioChannelTop">000–000</b></button>
+      <div class="health-card">
+        <div class="hc-head"><span>VITALS</span><b id="hudSide">—</b></div>
+        <div class="hpbar big"><i id="hudHp"></i><span id="hudHpText">100 / 100</span></div>
+        <div class="hc-sub"><span id="hudArmor">—</span><span id="hudCarry">0 / 120</span></div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="act" data-act="build"><b>B</b><span>BUILD</span></button>
+      <button class="act" data-act="armory"><b>H</b><span>ARMORY</span></button>
+      <button class="act" data-act="map"><b>M</b><span>MAP</span></button>
+      <button class="act" data-act="score"><b>TAB</b><span>ROSTER</span></button>
+      <button class="act" data-act="marker"><b>V</b><span>MARK</span></button>
+      <button class="act" data-act="order"><b>N</b><span>ORDER</span></button>
+      <button class="act" data-act="barrage"><b>T</b><span>BARRAGE</span></button>
+      <button class="act" data-act="interact"><b>E</b><span>INTERACT</span></button>
+      <button class="act" data-act="vehicle"><b>F</b><span>VEHICLE</span></button>
+      <button class="act" data-act="profile"><b>P</b><span>RECORD</span></button>
+    </div>
+    <div class="bottom-right">
+      <div class="weapon-card">
+        <div class="wc-name" id="hudWeapon">BOLT RIFLE</div>
+        <div class="wc-ammo"><b id="hudAmmo">5</b><span id="hudMag">/ 5</span></div>
+        <div class="wc-bar"><i id="hudReload"></i></div>
+        <div class="wc-carry" id="hudCarryDetail"></div>
+        <div class="wc-sub"><span id="hudGrenades">✦✦</span><span id="hudVehicle"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rank-track">
+    <div class="rt-head"><span id="hudRank">GUEST INFANTRY</span><span id="hudXpLabel">ENLIST TO EARN RANKS</span></div>
+    <div class="rt-bar"><i id="hudXp"></i></div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+  <div class="crosshair" id="crosshair"></div>
+  <div class="hitmark" id="hitmark"></div>
+  <div class="damage-flash" id="damageFlash"></div>
+
+  <div class="mobile-controls" id="mobileControls">
+    <div class="stick" id="stick"><i id="stickNub"></i></div>
+    <div class="mbtns">
+      <button class="mbtn" id="mFire">FIRE</button>
+      <button class="mbtn small" id="mReload">RELOAD</button>
+      <button class="mbtn small" id="mGrenade">GRENADE</button>
+      <button class="mbtn small" id="mInteract">E</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SCOREBOARD ===================== -->
+<section id="scoreboard" class="overlay hidden">
+  <div class="sb-card">
+    <header>
+      <h3>FIELD ROSTER</h3>
+      <span id="sbCount">—</span>
+    </header>
+    <div class="sb-scroll">
+      <table class="sb-table">
+        <thead><tr><th>#</th><th>SOLDIER</th><th>SIDE</th><th>K</th><th>D</th><th>A</th></tr></thead>
+        <tbody id="sbBody"></tbody>
+      </table>
+    </div>
+    <div class="sb-note">TAB — CLOSE ROSTER</div>
+  </div>
+</section>
+
+<!-- ===================== DEATH ===================== -->
+<section id="death" class="overlay hidden">
+  <div class="death-card">
+    <div class="kicker red">KILLED IN ACTION</div>
+    <h2 id="deathName">—</h2>
+    <div class="death-meta" id="deathMeta"></div>
+    <div class="spawn-list" id="deathSpawns"></div>
+    <button id="btnRespawn" class="primary big" disabled>RESPAWN IN 3…</button>
+  </div>
+</section>
+
+<!-- ===================== WAR END ===================== -->
+<section id="warEnd" class="overlay hidden">
+  <div class="warend-card">
+    <div class="kicker" id="warendKicker">ARMISTICE</div>
+    <h2 id="warendTitle">—</h2>
+    <div class="warend-sub" id="warendSub">—</div>
+    <div class="warend-pages" id="warPages"></div>
+    <div class="warend-nav">
+      <button id="warPrev" class="ghost small">‹ BACK</button>
+      <span id="warDots" class="war-dots"></span>
+      <button id="warNext" class="ghost small">NEXT ›</button>
+    </div>
+    <div class="warend-next" id="warendNext"></div>
+  </div>
+</section>
+
+<!-- ===================== BUILD MODAL ===================== -->
+<section id="modalBuild" class="modal hidden">
+  <div class="modal-card wide">
+    <header><h3>CONSTRUCTION</h3><button class="close" data-close="modalBuild">✕</button></header>
+    <div class="modal-sub">Defences are paid from the team stockpile. Click a blueprint, then click the ground.</div>
+    <div class="card-grid" id="buildCards"></div>
+  </div>
+</section>
+
+<!-- ===================== ARMORY MODAL ===================== -->
+<section id="modalArmory" class="modal hidden">
+  <div class="modal-card wide">
+    <header><h3>ARMORY</h3><button class="close" data-close="modalArmory">✕</button></header>
+    <div class="stock-strip" id="armoryStock"></div>
+    <div class="section-title">WEAPONS</div>
+    <div class="card-grid" id="weaponCards"></div>
+    <div class="section-title">ARMOR SETS</div>
+    <div class="card-grid" id="armorCards"></div>
+    <div class="section-title">VEHICLES <small>must be at MOB / depot</small></div>
+    <div class="card-grid" id="vehicleCards"></div>
+  </div>
+</section>
+
+<!-- ===================== PROFILE MODAL ===================== -->
+<section id="modalProfile" class="modal hidden">
+  <div class="modal-card">
+    <header><h3>SERVICE RECORD</h3><button class="close" data-close="modalProfile">✕</button></header>
+    <div id="profileBody"></div>
+  </div>
+</section>
+
+<!-- ===================== MAP OVERLAY ===================== -->
+<section id="modalMap" class="modal hidden">
+  <div class="modal-card wide map-modal">
+    <header><h3>THEATRE MAP</h3><button class="close" data-close="modalMap">✕</button></header>
+    <canvas id="bigMap" width="1000" height="700"></canvas>
+    <div class="map-legend">
+      <span><i class="dot red"></i>RED</span><span><i class="dot blue"></i>BLUE</span>
+      <span><i class="dot neutral"></i>NEUTRAL</span><span><i class="line"></i>TRENCH</span>
+      <span><i class="dot amber"></i>MARKER</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PAUSE / SETTINGS ===================== -->
+<section id="pause" class="modal hidden">
+  <div class="modal-card">
+    <header><h3>FIELD MENU</h3><button class="close" data-close="pause">✕</button></header>
+    <div class="pause-buttons">
+      <button id="btnResume" class="primary">RESUME</button>
+      <button id="btnSound" class="ghost">SOUND: ON</button>
+      <button id="btnLeave" class="ghost danger">LEAVE THE FRONT</button>
+    </div>
+    <div class="controls-list">
+      <div><b>WASD</b> move</div><div><b>MOUSE</b> aim / fire</div>
+      <div><b>R</b> reload</div><div><b>G</b> grenade</div>
+      <div><b>E</b> interact / board</div><div><b>F</b> enter vehicle</div>
+      <div><b>V</b> marker</div><div><b>N</b> order (Captain+)</div>
+      <div><b>M</b> theatre map</div><div><b>TAB</b> field roster</div>
+      <div><b>B</b> build</div><div><b>H</b> armory</div>
+      <div><b>T</b> artillery (Captain+)</div><div><b>ENTER</b> field radio</div>
+    </div>
+  </div>
+</section>
+
+<script src="js/state.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
+
